@@ -1,4 +1,4 @@
-package main
+package fynevnc
 
 import vnc "github.com/amitbet/vnc2video"
 

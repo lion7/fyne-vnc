@@ -1,4 +1,4 @@
 
 .PHONY: vnc
 vnc:
-	go run . localhost:5900 "password"
+	go run ./cmd localhost:5900 "password"

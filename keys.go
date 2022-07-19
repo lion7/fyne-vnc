@@ -1,4 +1,4 @@
-package main
+package fynevnc
 
 import (
 	"fyne.io/fyne/v2"
