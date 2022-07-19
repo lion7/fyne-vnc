@@ -2,70 +2,50 @@ package main
 
 import (
 	"fmt"
+	"fyne.io/fyne/v2/app"
+	vnc "github.com/amitbet/vnc2video"
 	"os"
 	"path/filepath"
-
-	"fyne.io/fyne"
-	"fyne.io/fyne/app"
-	"fyne.io/fyne/layout"
-	"fyne.io/fyne/widget"
-	vnc "github.com/amitbet/vnc2video"
 )
 
-func createVncConfig(password string) *vnc.ClientConfig {
-	cchServer := make(chan vnc.ServerMessage, 1)
-	cchClient := make(chan vnc.ClientMessage, 1)
-	errorCh := make(chan error, 1)
-
-	return &vnc.ClientConfig{
-		SecurityHandlers: []vnc.SecurityHandler{
-			&vnc.ClientAuthVNC{Password: []byte(password)},
-			&vnc.ClientAuthNone{},
-		},
-		DrawCursor:      true,
-		PixelFormat:     vnc.PixelFormat16bit,
-		ClientMessageCh: cchClient,
-		ServerMessageCh: cchServer,
-		ErrorCh:         errorCh,
-		Messages:        vnc.DefaultServerMessages,
-		Encodings: []vnc.Encoding{
-			&vnc.TightEncoding{},
-			&vnc.HextileEncoding{},
-			&vnc.ZRLEEncoding{},
-			&vnc.CopyRectEncoding{},
-			&vnc.CursorPseudoEncoding{},
-			&vnc.CursorPosPseudoEncoding{},
-			&vnc.ZLibEncoding{},
-			&vnc.RREEncoding{},
-			&vnc.RawEncoding{},
-		},
-	}
-}
-
 func main() {
-	if len(os.Args) < 4 {
+	if len(os.Args) != 3 {
 		cmd := filepath.Base(os.Args[0])
-		fmt.Printf("Usage: %s <vnc|rdp> address port", cmd)
+		fmt.Printf("Usage  : %s address password", cmd)
+		fmt.Printf("Example: %s localhost:5900 secret", cmd)
 		os.Exit(1)
 	}
 
-	config := createVncConfig(os.Args[3])
-	vncDisplay := NewVncDisplay(os.Args[1], os.Args[2], config)
+	addr := os.Args[1]
+	pass := os.Args[2]
 
-	vncApp := app.New()
-	title := fmt.Sprintf("VNC (%s:%s)", os.Args[1], os.Args[2])
-	w := vncApp.NewWindow(title)
+	err := OpenVncViewer(addr, CreateVncConfig(pass))
+	if err != nil {
+		panic(err)
+	}
+}
+
+func OpenVncViewer(addr string, config *vnc.ClientConfig) error {
+	a := app.New()
+	defer a.Quit()
+
+	w := a.NewWindow("VNC")
+	defer w.Close()
 
 	w.CenterOnScreen()
-	top := widget.NewHBox(
-		widget.NewButton("Quit", func() {
-			vncApp.Quit()
-		}),
-	)
-	content := fyne.NewContainerWithLayout(layout.NewBorderLayout(top, nil, nil, nil),
-		top, vncDisplay)
-	w.SetContent(content)
 
-	w.Resize(fyne.NewSize(1024, 768))
+	v := NewVncDisplay(addr, config)
+	defer v.Client.Close()
+
+	go func() {
+		if err := <-config.ErrorCh; err != nil {
+			w.Close()
+		}
+	}()
+
+	w.Resize(v.Size())
+	w.SetContent(v)
 	w.ShowAndRun()
+
+	return <-config.ErrorCh
 }
