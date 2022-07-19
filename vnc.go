@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	vnc "github.com/amitbet/vnc2video"
+	"github.com/amitbet/vnc2video/encoders"
 	"net"
 	"time"
 )
@@ -65,4 +66,21 @@ func (v *VncDisplay) LogVncMessages() {
 			fmt.Printf("Received server message type:%v msg:%v\n", msg.Type(), msg)
 		}
 	}
+}
+
+func (v *VncDisplay) RecordVideo(framerate int) {
+	codec := &encoders.MJPegImageEncoder{Quality: 60, Framerate: int32(framerate)}
+	go codec.Run("./output")
+	for !v.closed {
+		timeStart := time.Now()
+
+		codec.Encode(v.client.Canvas)
+
+		timeTarget := timeStart.Add((1000 / time.Duration(framerate)) * time.Millisecond)
+		timeLeft := timeTarget.Sub(time.Now())
+		if timeLeft > 0 {
+			time.Sleep(timeLeft)
+		}
+	}
+	codec.Close()
 }

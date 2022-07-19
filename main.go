@@ -26,6 +26,7 @@ func OpenVncViewer(addr string, config *vnc.ClientConfig) error {
 	}
 	defer v.Close()
 
+	w.SetPadded(false)
 	w.CenterOnScreen()
 	w.Resize(v.Size())
 	w.SetContent(v)

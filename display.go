@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	framerate = 10
 	minWidth  = 32
 	minHeight = 24
 )
@@ -47,32 +48,31 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, erro
 	if err != nil {
 		return nil, err
 	}
-	screenImage := client.Canvas.Image
 
 	for _, encoding := range config.Encodings {
 		renderer, ok := encoding.(vnc.Renderer)
 		if ok {
-			renderer.SetTargetImage(screenImage)
+			renderer.SetTargetImage(client.Canvas.Image)
 		}
 	}
 
 	err = client.SetEncodings([]vnc.EncodingType{
-		//vnc.EncCursorPseudo,
-		//vnc.EncPointerPosPseudo,
-		//vnc.EncCopyRect,
-		vnc.EncTight,
-		//vnc.EncZRLE,
+		vnc.EncCursorPseudo,
+		vnc.EncPointerPosPseudo,
+		vnc.EncCopyRect,
+		//vnc.EncTight,
+		vnc.EncZRLE,
 		vnc.EncRaw,
-		//vnc.EncHextile,
-		//vnc.EncZlib,
-		//vnc.EncRRE,
+		vnc.EncHextile,
+		vnc.EncZlib,
+		vnc.EncRRE,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error setting encodings: %v\n", err)
 	}
 
 	// Create a fyne canvas image from our screen image
-	display := canvas.NewImageFromImage(screenImage)
+	display := canvas.NewImageFromImage(client.Canvas.Image)
 	display.FillMode = canvas.ImageFillContain
 
 	// Instantiate the VncDisplay
@@ -99,10 +99,13 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, erro
 	}
 
 	// Request framebuffer updates 10 times per second
-	go viewer.PeriodicallyRequestFramebufferUpdate(10)
+	go viewer.PeriodicallyRequestFramebufferUpdate(framerate)
 
 	// Refresh the display when we receive a framebuffer update
 	go viewer.RefreshOnFramebufferUpdate()
+
+	// Record a video
+	//go viewer.RecordVideo(framerate)
 
 	return viewer, nil
 }
