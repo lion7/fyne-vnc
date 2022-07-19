@@ -8,32 +8,35 @@ import (
 	"time"
 )
 
-func connectVnc(addr string, config *vnc.ClientConfig) *vnc.ClientConn {
+func connectVnc(addr string, config *vnc.ClientConfig) (*vnc.ClientConn, error) {
 	// Establish TCP connection to VNC server.
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
-		panic(fmt.Sprintf("Error connecting to VNC host. %v", err))
+		return nil, fmt.Errorf("error connecting to VNC host. %v", err)
 	}
 
-	client, err := vnc.Connect(context.Background(), conn, config)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client, err := vnc.Connect(ctx, conn, config)
 	if err != nil {
-		panic(fmt.Sprintf("Error negotiating connection to VNC host. %v", err))
+		return nil, fmt.Errorf("error negotiating connection to VNC host. %v", err)
 	}
 
-	return client
+	return client, nil
 }
 
-func RequestFramebufferUpdate(client *vnc.ClientConn) {
-	reqMsg := vnc.FramebufferUpdateRequest{Inc: 1, X: 0, Y: 0, Width: client.Width(), Height: client.Height()}
-	if err := reqMsg.Write(client); err != nil {
+func (v *VncDisplay) RequestFramebufferUpdate() {
+	reqMsg := vnc.FramebufferUpdateRequest{Inc: 1, X: 0, Y: 0, Width: v.client.Width(), Height: v.client.Height()}
+	if err := reqMsg.Write(v.client); err != nil {
 		fmt.Printf("error requesting framebuffer update: %v\n", err)
+		v.config.ErrorCh <- err
 	}
 }
 
-func PeriodicallyRequestFramebufferUpdate(client *vnc.ClientConn, framerate int) {
-	for {
+func (v *VncDisplay) PeriodicallyRequestFramebufferUpdate(framerate int) {
+	for !v.closed {
 		timeStart := time.Now()
-		RequestFramebufferUpdate(client)
+		v.RequestFramebufferUpdate()
 		timeTarget := timeStart.Add((1000 / time.Duration(framerate)) * time.Millisecond)
 		timeLeft := timeTarget.Sub(time.Now())
 		if timeLeft > 0 {
@@ -42,23 +45,23 @@ func PeriodicallyRequestFramebufferUpdate(client *vnc.ClientConn, framerate int)
 	}
 }
 
-func ExecuteOnFramebufferUpdate(config *vnc.ClientConfig, onFramebufferUpdate func()) {
-	for {
-		msg := <-config.ServerMessageCh
+func (v *VncDisplay) RefreshOnFramebufferUpdate() {
+	for !v.closed {
+		msg := <-v.config.ServerMessageCh
 		if msg.Type() == vnc.FramebufferUpdateMsgType {
-			onFramebufferUpdate()
+			v.display.Refresh()
 		}
 	}
 }
 
-func LogVncMessages(config *vnc.ClientConfig) {
-	for {
+func (v *VncDisplay) LogVncMessages() {
+	for !v.closed {
 		select {
-		case err := <-config.ErrorCh:
+		case err := <-v.config.ErrorCh:
 			fmt.Printf("Received error message: %s\n", err.Error())
-		case msg := <-config.ClientMessageCh:
+		case msg := <-v.config.ClientMessageCh:
 			fmt.Printf("Received client message type:%v msg:%v\n", msg.Type(), msg)
-		case msg := <-config.ServerMessageCh:
+		case msg := <-v.config.ServerMessageCh:
 			fmt.Printf("Received server message type:%v msg:%v\n", msg.Type(), msg)
 		}
 	}

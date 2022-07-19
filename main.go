@@ -12,20 +12,24 @@ func OpenVncViewer(addr string, config *vnc.ClientConfig) error {
 	w := a.NewWindow("VNC")
 	defer w.Close()
 
-	w.CenterOnScreen()
-
-	v := NewVncDisplay(addr, config)
-	defer v.Client.Close()
-
+	var channelErr error
 	go func() {
 		if err := <-config.ErrorCh; err != nil {
+			channelErr = err
 			w.Close()
 		}
 	}()
 
+	v, err := ConnectVncDisplay(addr, config)
+	if err != nil {
+		return err
+	}
+	defer v.Close()
+
+	w.CenterOnScreen()
 	w.Resize(v.Size())
 	w.SetContent(v)
 	w.ShowAndRun()
 
-	return <-config.ErrorCh
+	return channelErr
 }

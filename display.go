@@ -18,8 +18,15 @@ type VncDisplay struct {
 	keyboardHandler
 	mouseHandler
 
-	Client  *vnc.ClientConn
-	Display *canvas.Image
+	closed  bool
+	client  *vnc.ClientConn
+	config  *vnc.ClientConfig
+	display *canvas.Image
+}
+
+func (v *VncDisplay) Close() {
+	v.closed = true
+	v.client.Close()
 }
 
 func (v *VncDisplay) MinSize() fyne.Size {
@@ -31,12 +38,15 @@ func (v *VncDisplay) MinSize() fyne.Size {
 }
 
 func (v *VncDisplay) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(v.Display)
+	return widget.NewSimpleRenderer(v.display)
 }
 
-// NewVncDisplay creates a new VncDisplay and does all the heavy lifting, setting up all event handlers
-func NewVncDisplay(addr string, config *vnc.ClientConfig) *VncDisplay {
-	client := connectVnc(addr, config)
+// ConnectVncDisplay creates a new VncDisplay and does all the heavy lifting, setting up all event handlers
+func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, error) {
+	client, err := connectVnc(addr, config)
+	if err != nil {
+		return nil, err
+	}
 	screenImage := client.Canvas.Image
 
 	for _, encoding := range config.Encodings {
@@ -46,7 +56,7 @@ func NewVncDisplay(addr string, config *vnc.ClientConfig) *VncDisplay {
 		}
 	}
 
-	err := client.SetEncodings([]vnc.EncodingType{
+	err = client.SetEncodings([]vnc.EncodingType{
 		//vnc.EncCursorPseudo,
 		//vnc.EncPointerPosPseudo,
 		//vnc.EncCopyRect,
@@ -58,7 +68,7 @@ func NewVncDisplay(addr string, config *vnc.ClientConfig) *VncDisplay {
 		//vnc.EncRRE,
 	})
 	if err != nil {
-		fmt.Printf("error setting encodings: %v\n", err)
+		return nil, fmt.Errorf("error setting encodings: %v\n", err)
 	}
 
 	// Create a fyne canvas image from our screen image
@@ -66,7 +76,7 @@ func NewVncDisplay(addr string, config *vnc.ClientConfig) *VncDisplay {
 	display.FillMode = canvas.ImageFillContain
 
 	// Instantiate the VncDisplay
-	viewer := &VncDisplay{Client: client, Display: display}
+	viewer := &VncDisplay{client: client, config: config, display: display}
 
 	// Set the initial size equal to the framebuffer size
 	viewer.Resize(fyne.NewSize(float32(client.Width()), float32(client.Height())))
@@ -89,10 +99,10 @@ func NewVncDisplay(addr string, config *vnc.ClientConfig) *VncDisplay {
 	}
 
 	// Request framebuffer updates 10 times per second
-	go PeriodicallyRequestFramebufferUpdate(client, 10)
+	go viewer.PeriodicallyRequestFramebufferUpdate(10)
 
 	// Refresh the display when we receive a framebuffer update
-	go ExecuteOnFramebufferUpdate(config, display.Refresh)
+	go viewer.RefreshOnFramebufferUpdate()
 
-	return viewer
+	return viewer, nil
 }
