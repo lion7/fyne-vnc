@@ -8,7 +8,7 @@ func CreateVncConfig(password string) *vnc.ClientConfig {
 	errorCh := make(chan error)
 	var securityHandlers []vnc.SecurityHandler
 	if password != "" {
-		securityHandlers = []vnc.SecurityHandler{&vnc.ClientAuthVNC{Password: []byte(password)}}
+		securityHandlers = []vnc.SecurityHandler{&vnc.ClientAuthVNC{Password: []byte(password)}, &vnc.ClientAuthNone{}}
 	} else {
 		securityHandlers = []vnc.SecurityHandler{&vnc.ClientAuthNone{}}
 	}

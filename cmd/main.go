@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"fyne.io/fyne/v2/app"
 	fynevnc "github.com/lion7/fyne-vnc"
 	"os"
 	"path/filepath"
@@ -17,8 +18,33 @@ func main() {
 
 	addr := os.Args[1]
 	pass := os.Args[2]
+	conf := fynevnc.CreateVncConfig(pass)
 
-	err := fynevnc.OpenVncViewer(addr, fynevnc.CreateVncConfig(pass))
+	a := app.New()
+	defer a.Quit()
+
+	w := a.NewWindow("VNC")
+	defer w.Close()
+
+	var err error
+	go func() {
+		if err := <-conf.ErrorCh; err != nil {
+			w.Close()
+		}
+	}()
+
+	v, err := fynevnc.ConnectVncDisplay(addr, conf)
+	if err != nil {
+		panic(err)
+	}
+	defer v.Close()
+
+	w.SetPadded(false)
+	w.CenterOnScreen()
+	w.Resize(v.Size())
+	w.SetContent(v)
+	w.ShowAndRun()
+
 	if err != nil {
 		panic(err)
 	}

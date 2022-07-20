@@ -16,12 +16,17 @@ func connectVnc(addr string, config *vnc.ClientConfig) (*vnc.ClientConn, error) 
 		return nil, fmt.Errorf("error connecting to VNC host. %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	client, err := vnc.Connect(ctx, conn, config)
+	// Set a read/write deadline of 5 seconds.
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+	// Attempt to negotiate the VNC connection
+	client, err := vnc.Connect(context.Background(), conn, config)
 	if err != nil {
 		return nil, fmt.Errorf("error negotiating connection to VNC host. %v", err)
 	}
+
+	// Remove the deadline for future read/writes
+	conn.SetDeadline(time.Time{})
 
 	return client, nil
 }

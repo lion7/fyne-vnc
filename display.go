@@ -52,7 +52,7 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, erro
 	for _, encoding := range config.Encodings {
 		renderer, ok := encoding.(vnc.Renderer)
 		if ok {
-			renderer.SetTargetImage(client.Canvas.Image)
+			renderer.SetTargetImage(client.Canvas)
 		}
 	}
 
@@ -72,7 +72,7 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, erro
 	}
 
 	// Create a fyne canvas image from our screen image
-	display := canvas.NewImageFromImage(client.Canvas.Image)
+	display := canvas.NewImageFromImage(client.Canvas)
 	display.FillMode = canvas.ImageFillContain
 
 	// Instantiate the VncDisplay
