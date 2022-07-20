@@ -32,13 +32,28 @@ func main() {
 		}
 	}()
 
-	err := fynevnc.ConnectVncDisplay(addr, conf, w)
+	v, err := fynevnc.ConnectVncDisplay(addr, conf)
 	if err != nil {
 		panic(err)
 	}
+	defer v.Close()
 
+	// Add keyboard handler. Hopefully not needed in later versions of Fyne...
+	w.Canvas().SetOnTypedKey(v.TypedKey)
+
+	// Remove default padding to get a seamless viewer.
 	w.SetPadded(false)
+
+	// Center the window on screen.
 	w.CenterOnScreen()
+
+	// Initially resize the window to fully fit the viewer.
+	w.Resize(v.Size())
+
+	// Set the viewer as the content of the window.
+	w.SetContent(v)
+
+	// Show the window.
 	w.ShowAndRun()
 
 	if err != nil {

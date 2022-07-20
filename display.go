@@ -42,16 +42,12 @@ func (v *VncDisplay) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(v.display)
 }
 
-// ConnectVncDisplay renders a new VncDisplay on the canvas and does all the heavy lifting, setting up all event handlers
-func ConnectVncDisplay(addr string, config *vnc.ClientConfig, w fyne.Window) error {
+// ConnectVncDisplay creates a new VncDisplay and does all the heavy lifting, setting up all event handlers
+func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, error) {
 	client, err := connectVnc(addr, config)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
-	w.SetOnClosed(func() {
-		client.Close()
-	})
 
 	for _, encoding := range config.Encodings {
 		renderer, ok := encoding.(vnc.Renderer)
@@ -72,7 +68,7 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig, w fyne.Window) err
 		vnc.EncRRE,
 	})
 	if err != nil {
-		return fmt.Errorf("error setting encodings: %v\n", err)
+		return nil, fmt.Errorf("error setting encodings: %v\n", err)
 	}
 
 	// Create a fyne canvas image from our screen image
@@ -87,15 +83,6 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig, w fyne.Window) err
 	// Set the initial size equal to the framebuffer size
 	v.Resize(fyne.NewSize(float32(client.Width()), float32(client.Height())))
 
-	// Add keyboard handler.
-	w.Canvas().SetOnTypedKey(v.TypedKey)
-
-	// Initially resize the window to fully fit the VncDisplay.
-	w.Resize(v.Size())
-
-	// Set the VncDisplay as the content of the window.
-	w.SetContent(v)
-
 	// Request framebuffer updates 10 times per second
 	go v.PeriodicallyRequestFramebufferUpdate(framerate)
 
@@ -108,5 +95,5 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig, w fyne.Window) err
 	// Log all VNC messages
 	//go v.LogVncMessages()
 
-	return nil
+	return v, nil
 }
