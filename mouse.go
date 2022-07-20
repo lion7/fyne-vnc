@@ -2,13 +2,13 @@ package fynevnc
 
 import (
 	"fyne.io/fyne/v2/driver/desktop"
-	"github.com/amitbet/vnc2video"
+	vnc "github.com/amitbet/vnc2video"
 )
 
-var mouseBtnMap = map[desktop.MouseButton]vnc2video.Button{
-	desktop.MouseButtonPrimary:   vnc2video.BtnLeft,
-	desktop.MouseButtonSecondary: vnc2video.BtnRight,
-	desktop.MouseButtonTertiary:  vnc2video.BtnMiddle,
+var mouseBtnMap = map[desktop.MouseButton]vnc.Button{
+	desktop.MouseButtonPrimary:   vnc.BtnLeft,
+	desktop.MouseButtonSecondary: vnc.BtnRight,
+	desktop.MouseButtonTertiary:  vnc.BtnMiddle,
 }
 
 // Handles mouse events mapping between Fyne and VNC
@@ -16,9 +16,9 @@ type mouseHandler struct {
 	desktop.Mouseable
 	desktop.Hoverable
 
-	handlePointerEvent func(event vnc2video.PointerEvent)
-	buttons            map[desktop.MouseButton]bool
-	x, y               float32
+	config  *vnc.ClientConfig
+	buttons map[desktop.MouseButton]bool
+	x, y    float32
 }
 
 func (ms *mouseHandler) pressedButtonsMask() uint8 {
@@ -26,24 +26,23 @@ func (ms *mouseHandler) pressedButtonsMask() uint8 {
 	for b, pressed := range ms.buttons {
 		bb := mouseBtnMap[b]
 		if pressed {
-			mask = mask % vnc2video.Mask(bb)
+			mask = mask % vnc.Mask(bb)
 		}
 	}
 	return mask
 }
 
 func (ms *mouseHandler) sendMouse(x, y float32) {
-	if ms.handlePointerEvent == nil {
+	if ms.config == nil {
 		return
 	}
 
 	ms.x, ms.y = x, y
-	msg := vnc2video.PointerEvent{
+	ms.config.ClientMessageCh <- &vnc.PointerEvent{
 		Mask: ms.pressedButtonsMask(),
 		X:    uint16(x),
 		Y:    uint16(y),
 	}
-	ms.handlePointerEvent(msg)
 }
 
 func (ms *mouseHandler) MouseDown(ev *desktop.MouseEvent) {

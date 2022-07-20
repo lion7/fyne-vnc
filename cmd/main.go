@@ -11,8 +11,8 @@ import (
 func main() {
 	if len(os.Args) != 3 {
 		cmd := filepath.Base(os.Args[0])
-		fmt.Printf("Usage  : %s address password", cmd)
-		fmt.Printf("Example: %s localhost:5900 secret", cmd)
+		fmt.Printf("Usage  : %s address password\n", cmd)
+		fmt.Printf("Example: %s localhost:5900 secret\n", cmd)
 		os.Exit(1)
 	}
 
@@ -26,23 +26,19 @@ func main() {
 	w := a.NewWindow("VNC")
 	defer w.Close()
 
-	var err error
 	go func() {
 		if err := <-conf.ErrorCh; err != nil {
 			w.Close()
 		}
 	}()
 
-	v, err := fynevnc.ConnectVncDisplay(addr, conf)
+	err := fynevnc.ConnectVncDisplay(addr, conf, w)
 	if err != nil {
 		panic(err)
 	}
-	defer v.Close()
 
 	w.SetPadded(false)
 	w.CenterOnScreen()
-	w.Resize(v.Size())
-	w.SetContent(v)
 	w.ShowAndRun()
 
 	if err != nil {

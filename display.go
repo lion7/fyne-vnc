@@ -42,12 +42,16 @@ func (v *VncDisplay) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(v.display)
 }
 
-// ConnectVncDisplay creates a new VncDisplay and does all the heavy lifting, setting up all event handlers
-func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, error) {
+// ConnectVncDisplay renders a new VncDisplay on the canvas and does all the heavy lifting, setting up all event handlers
+func ConnectVncDisplay(addr string, config *vnc.ClientConfig, w fyne.Window) error {
 	client, err := connectVnc(addr, config)
 	if err != nil {
-		return nil, err
+		return err
 	}
+
+	w.SetOnClosed(func() {
+		client.Close()
+	})
 
 	for _, encoding := range config.Encodings {
 		renderer, ok := encoding.(vnc.Renderer)
@@ -68,7 +72,7 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, erro
 		vnc.EncRRE,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error setting encodings: %v\n", err)
+		return fmt.Errorf("error setting encodings: %v\n", err)
 	}
 
 	// Create a fyne canvas image from our screen image
@@ -76,36 +80,33 @@ func ConnectVncDisplay(addr string, config *vnc.ClientConfig) (*VncDisplay, erro
 	display.FillMode = canvas.ImageFillContain
 
 	// Instantiate the VncDisplay
-	viewer := &VncDisplay{client: client, config: config, display: display}
+	v := &VncDisplay{client: client, config: config, display: display}
+	v.keyboardHandler.config = config
+	v.mouseHandler.config = config
 
 	// Set the initial size equal to the framebuffer size
-	viewer.Resize(fyne.NewSize(float32(client.Width()), float32(client.Height())))
+	v.Resize(fyne.NewSize(float32(client.Width()), float32(client.Height())))
 
-	// Add handler for keyboard events
-	viewer.handleKeyEvent = func(msg vnc.KeyEvent) {
-		err := msg.Write(client)
-		if err != nil {
-			fmt.Printf("error sending key event: %v\n", err)
-		}
-	}
+	// Add keyboard handler.
+	w.Canvas().SetOnTypedKey(v.TypedKey)
 
-	// Add handler for mouse / pointer events
-	viewer.handlePointerEvent = func(msg vnc.PointerEvent) {
-		err := msg.Write(client)
-		if err != nil {
-			fmt.Printf("error sending pointer event: %v\n", err)
-		}
-		display.Refresh()
-	}
+	// Initially resize the window to fully fit the VncDisplay.
+	w.Resize(v.Size())
+
+	// Set the VncDisplay as the content of the window.
+	w.SetContent(v)
 
 	// Request framebuffer updates 10 times per second
-	go viewer.PeriodicallyRequestFramebufferUpdate(framerate)
+	go v.PeriodicallyRequestFramebufferUpdate(framerate)
 
 	// Refresh the display when we receive a framebuffer update
-	go viewer.RefreshOnFramebufferUpdate()
+	go v.RefreshOnFramebufferUpdate()
 
 	// Record a video
-	//go viewer.RecordVideo(framerate)
+	//go v.RecordVideo(framerate)
 
-	return viewer, nil
+	// Log all VNC messages
+	//go v.LogVncMessages()
+
+	return nil
 }

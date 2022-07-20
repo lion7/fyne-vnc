@@ -3,9 +3,9 @@ package fynevnc
 import vnc "github.com/amitbet/vnc2video"
 
 func CreateVncConfig(password string) *vnc.ClientConfig {
-	cchServer := make(chan vnc.ServerMessage)
-	cchClient := make(chan vnc.ClientMessage)
-	errorCh := make(chan error)
+	cchServer := make(chan vnc.ServerMessage, 1)
+	cchClient := make(chan vnc.ClientMessage, 1)
+	errorCh := make(chan error, 1)
 	var securityHandlers []vnc.SecurityHandler
 	if password != "" {
 		securityHandlers = []vnc.SecurityHandler{&vnc.ClientAuthVNC{Password: []byte(password)}, &vnc.ClientAuthNone{}}
